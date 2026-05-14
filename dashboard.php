@@ -50,9 +50,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     if (empty($message) && !empty($quote) && !empty($video_filename)) {
+        // Fetch current media to delete after successful update
+        $old_stmt = $pdo->query("SELECT video_filename, audio_filename FROM content ORDER BY created_at DESC LIMIT 1");
+        $old_files = $old_stmt->fetch();
+
         $stmt = $pdo->prepare("INSERT INTO content (quote, video_filename, audio_filename) VALUES (?, ?, ?)");
-        $stmt->execute([$quote, $video_filename, $audio_filename]);
-        $message = "Mood updated successfully.";
+        if ($stmt->execute([$quote, $video_filename, $audio_filename])) {
+            // Cleanup old files
+            if ($old_files) {
+                $old_video = "assets/media/" . $old_files['video_filename'];
+                if (file_exists($old_video)) unlink($old_video);
+                
+                if (!empty($old_files['audio_filename'])) {
+                    $old_audio = "assets/media/" . $old_files['audio_filename'];
+                    if (file_exists($old_audio)) unlink($old_audio);
+                }
+            }
+            $message = "Mood updated successfully. Old media files have been cleared.";
+        } else {
+            $message = "Database update failed.";
+        }
     }
 }
 
